@@ -11,10 +11,8 @@
 #endif
 #ifndef HTTPP_SERVER
 #define HTTPP_SERVER 1
-#define HTTPP_UTILS 1
 #endif
 
-#include <iostream>
 #include <string>
 #include <functional>
 #include <unordered_map>
@@ -23,7 +21,6 @@
 #include <fstream>
 #include <random>
 #include <iomanip>
-#include <filesystem>
 #include <algorithm>
 #include <openssl/evp.h>
 #include <boost/system/detail/error_code.hpp>
@@ -173,7 +170,7 @@ namespace httpp {
                  * @brief  Assemble a URL from specified parts
                  * @return Returns a full URL based on the parts
                  */
-                std::string assemble_url_from_parts();
+                std::string assemble_url_from_parts() const;
         };
 
         struct MultipartFile {
@@ -304,24 +301,24 @@ namespace httpp {
                 void set_header(const std::string& header, const std::string& data);
                 /**
                  * @brief  Set the authentication header
-                 * @param  Data The data to set the header to
+                 * @param  data The data to set the header to
                  */
                 void set_authentication_header(const std::string& data);
                 /**
                  * @brief  Set the Content-Type header
-                 * @param  Data The data to set the header to
+                 * @param  data The data to set the header to
                  */
                 void set_content_type_header(const std::string& data);
                 /**
                  * @brief  Make a network request
                  * @return Returns a Response object
                  */
-                Response make_request();
+                Response make_request() const;
                 /**
                  * @brief  Download a file from a network request
                  * @return Returns a boolean indicating if the download was successful
                  */
-                bool download_file();
+                bool download_file() const;
         };
 
         inline std::string user_cert{}; // User-specified root certificate string, probably unused.
@@ -335,24 +332,24 @@ namespace httpp {
 
 #if HTTPP_IMPLEMENTATION
 #if HTTPP_CLIENT
-void httpp::Client::Request::set_header(const std::string& header, const std::string& data) {
+inline void httpp::Client::Request::set_header(const std::string& header, const std::string& data) {
     header_name.push_back(header);
     header_data.push_back(data);
 }
 
-void httpp::Client::Request::set_authentication_header(const std::string& data) {
+inline void httpp::Client::Request::set_authentication_header(const std::string& data) {
     authentication_header_data = data;
     authentication = true;
 }
 
-void httpp::Client::Request::set_content_type_header(const std::string& data) {
+inline void httpp::Client::Request::set_content_type_header(const std::string& data) {
     content_type_header_data = data;
 }
 
-httpp::Client::Response httpp::Client::Request::make_request() {
-    httpp::Client::Response resp;
-
+inline httpp::Client::Response httpp::Client::Request::make_request() const {
     try {
+        Response resp;
+
         boost::asio::ssl::context ctx(boost::asio::ssl::context::tlsv12_client);
 
         const std::string cert = httpp::Client::get_root_certificates();
@@ -464,11 +461,9 @@ httpp::Client::Response httpp::Client::Request::make_request() {
     } catch (boost::wrapexcept<boost::system::system_error> const &e) {
         throw std::runtime_error{e.what()}; // so that it can be handled by slogger in the main code.
     }
-
-    return resp;
 }
 
-bool httpp::Client::Request::download_file() {
+inline bool httpp::Client::Request::download_file() const {
     if (!output_file.compare(""))
         return false;
 
@@ -487,7 +482,7 @@ bool httpp::Client::Request::download_file() {
  * Should ideally be swapped out 5 or so years after
  * TODO: Write a program which generates a function like this using the latest root certificates.
  */
-std::string httpp::Client::get_root_certificates() {
+inline std::string httpp::Client::get_root_certificates() {
     if (user_cert.compare("")) {
         return user_cert;
     }
@@ -3721,7 +3716,7 @@ std::string httpp::Client::get_root_certificates() {
 }
 #endif
 #if HTTPP_UTILS
-std::unordered_map<std::string, std::string> httpp::Utils::parse_fields(const std::string& _body) {
+inline std::unordered_map<std::string, std::string> httpp::Utils::parse_fields(const std::string& _body) {
     std::string body = _body;
 
     if (!body.empty() && body.back() != '&') {
@@ -3748,7 +3743,7 @@ std::unordered_map<std::string, std::string> httpp::Utils::parse_fields(const st
     return ret;
 }
 
-std::unordered_map<std::string, std::string> httpp::Utils::parse_query_string(const std::string& url) {
+inline std::unordered_map<std::string, std::string> httpp::Utils::parse_query_string(const std::string& url) {
     std::size_t pos = url.find('?');
 
     if (pos == std::string::npos) {
@@ -3760,7 +3755,7 @@ std::unordered_map<std::string, std::string> httpp::Utils::parse_query_string(co
     return parse_fields(req);
 }
 
-std::unordered_map<std::string, std::string> httpp::Utils::parse_multipart_form_data(const std::string& request, const std::size_t max_len) {
+inline std::unordered_map<std::string, std::string> httpp::Utils::parse_multipart_form_data(const std::string& request, const std::size_t max_len) {
     const auto split = [](const std::string& str, const std::string& delimiter) -> std::vector<std::string> {
         std::vector<std::string> tokens{};
 
@@ -3847,7 +3842,7 @@ std::unordered_map<std::string, std::string> httpp::Utils::parse_multipart_form_
     return ret;
 }
 
-std::vector<httpp::Utils::MultipartFile> httpp::Utils::parse_multipart_form_file(const std::string& request, const std::string& format, const std::size_t max_chunk_size) {
+inline std::vector<httpp::Utils::MultipartFile> httpp::Utils::parse_multipart_form_file(const std::string& request, const std::string& format, const std::size_t max_chunk_size) {
     const auto split = [](const std::string& str, const std::string& delimiter) -> std::vector<std::string> {
         std::vector<std::string> tokens{};
         std::size_t start{0};
@@ -3994,11 +3989,11 @@ std::vector<httpp::Utils::MultipartFile> httpp::Utils::parse_multipart_form_file
     return ret;
 }
 
-std::vector<httpp::Utils::MultipartFile> httpp::Utils::parse_multipart_form_file(const httpp::Server::Request& request, const std::string& format, const std::size_t max_chunk_size) {
+inline std::vector<httpp::Utils::MultipartFile> httpp::Utils::parse_multipart_form_file(const httpp::Server::Request& request, const std::string& format, const std::size_t max_chunk_size) {
     return parse_multipart_form_file("Content-Type: " + request.content_type + "\r\n" + request.body, format, max_chunk_size);
 }
 
-std::string httpp::Utils::htmlspecialchars(const std::string& str) {
+inline std::string httpp::Utils::htmlspecialchars(const std::string& str) {
     std::string ret{str};
 
     for (std::size_t i{0}; i < ret.length(); i++) {
@@ -4020,7 +4015,7 @@ std::string httpp::Utils::htmlspecialchars(const std::string& str) {
     return ret;
 }
 
-std::string httpp::Utils::htmlspecialchars_decode(const std::string& str) {
+inline std::string httpp::Utils::htmlspecialchars_decode(const std::string& str) {
     std::string ret{str};
 
     for (std::size_t i{0}; i < ret.length(); i++) {
@@ -4044,7 +4039,7 @@ std::string httpp::Utils::htmlspecialchars_decode(const std::string& str) {
     return ret;
 }
 
-std::string httpp::Utils::remove_quotes(const std::string& str) {
+inline std::string httpp::Utils::remove_quotes(const std::string& str) {
     std::string ret{str};
 
     ret.erase(std::remove_if(ret.begin(), ret.end(), [](const char c) {
@@ -4054,7 +4049,7 @@ std::string httpp::Utils::remove_quotes(const std::string& str) {
     return ret;
 }
 
-std::string httpp::Utils::generate_random_string(const int length) {
+inline std::string httpp::Utils::generate_random_string(const int length) {
     static constexpr char charset[] =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -4075,7 +4070,7 @@ std::string httpp::Utils::generate_random_string(const int length) {
 }
 
 
-std::string httpp::Utils::get_appropriate_content_type(const std::string& fn) {
+inline std::string httpp::Utils::get_appropriate_content_type(const std::string& fn) {
     std::size_t pos = fn.find_last_of('.');
     if (pos == std::string::npos) {
         return "application/octet-stream";
@@ -4171,7 +4166,7 @@ std::string httpp::Utils::get_appropriate_content_type(const std::string& fn) {
     }
 }
 
-std::string httpp::Utils::sha256hash(const std::string& data) {
+inline std::string httpp::Utils::sha256hash(const std::string& data) {
     std::string ret{};
 
     EVP_MD_CTX* context = EVP_MD_CTX_new();
@@ -4200,7 +4195,7 @@ std::string httpp::Utils::sha256hash(const std::string& data) {
     return ret;
 }
 
-void httpp::Utils::URL::parse_url_from_string(const std::string& URL) {
+inline void httpp::Utils::URL::parse_url_from_string(const std::string& URL) {
     std::string url{URL};
     std::size_t pos{url.find("https://")};
 
@@ -4240,13 +4235,13 @@ void httpp::Utils::URL::parse_url_from_string(const std::string& URL) {
     }
 }
 
-std::string httpp::Utils::URL::assemble_url_from_parts() {
+inline std::string httpp::Utils::URL::assemble_url_from_parts() const {
     std::string ret{};
 
     if (protocol == httpp::Protocol::Https) {
         ret += "https://" + host;
     } else {
-        ret += "http://" + host;
+        ret += "http://" + host; //NOLINT
     }
 
     if (!(protocol == httpp::Protocol::Https && port == 443) &&
@@ -4261,14 +4256,14 @@ std::string httpp::Utils::URL::assemble_url_from_parts() {
 #endif
 #if HTTPP_SERVER
 namespace __httpp_impl {
-    std::function<httpp::Server::Response(const httpp::Server::Request&)> generate_response_from_endpoint;
+    inline std::function<httpp::Server::Response(const httpp::Server::Request&)> generate_response_from_endpoint;
     void stop();
     static bool enable_session{true};
     static std::string session_dir{"./sessions"};
     static std::string session_cookie_name{"session_id"};
     static int64_t max_request_size{1024 * 1024 * 1024};
 
-    std::string convert_unix_millis_to_gmt(const int64_t unix_millis) {
+    inline std::string convert_unix_millis_to_gmt(const int64_t unix_millis) {
         if (unix_millis == -1) {
             return "Thu, 01 Jan 1970 00:00:00 GMT";
         }
@@ -4324,7 +4319,7 @@ namespace __httpp_impl {
                     net_buffer,
                     *parser,
 
-                    [self](boost::beast::error_code ec, std::size_t transferred_bytes) {
+                    [self](const boost::beast::error_code& ec, std::size_t transferred_bytes) {
                         self->on_read(ec, transferred_bytes);
                     }
                 );
@@ -4335,7 +4330,7 @@ namespace __httpp_impl {
              * @param ec The error code
              * @param transferred_bytes The amount of bytes transferred
              */
-            void on_read(boost::beast::error_code ec, std::size_t transferred_bytes) {
+            void on_read(const boost::beast::error_code& ec, std::size_t transferred_bytes) {
                 static_cast<void>(transferred_bytes); // prevents a unused parameter warning
 
                 if (!ec) {
@@ -4344,7 +4339,7 @@ namespace __httpp_impl {
                 }
             }
 
-            std::vector<httpp::Server::Cookie> get_cookies_from_request(const std::string& cookie_header) {
+            static std::vector<httpp::Server::Cookie> get_cookies_from_request(const std::string& cookie_header) {
                 std::vector<httpp::Server::Cookie> cookies;
                 std::string cookie_str = cookie_header + ";";
 
@@ -4366,7 +4361,7 @@ namespace __httpp_impl {
                 return cookies;
             }
 
-            std::unordered_map<std::string, std::string> read_from_session_file(const std::string& f) {
+            static std::unordered_map<std::string, std::string> read_from_session_file(const std::string& f) {
                 std::unordered_map<std::string, std::string> session;
 
                 std::ifstream file(f);
@@ -4395,7 +4390,7 @@ namespace __httpp_impl {
                 return session;
             }
 
-            void write_to_session_file(const std::string& f, const std::unordered_map<std::string, std::string>& session) {
+            static void write_to_session_file(const std::string& f, const std::unordered_map<std::string, std::string>& session) {
                 std::ofstream file(f, std::ios::trunc);
 
                 if (!file.is_open() || !file.good()) {
@@ -4525,7 +4520,7 @@ namespace __httpp_impl {
                 boost::beast::http::async_write(
                     net_socket,
                     net_response,
-                    [self](boost::beast::error_code ec, std::size_t transferred_bytes) {
+                    [self](const boost::beast::error_code& ec, std::size_t transferred_bytes) {
                         static_cast<void>(transferred_bytes);
                         self->on_write(ec);
                     }
@@ -4536,7 +4531,7 @@ namespace __httpp_impl {
              * @brief Handles the write request
              * @param ec The error code
              */
-            void on_write(boost::beast::error_code ec) {
+            void on_write(const boost::beast::error_code& ec) {
                 if (!ec) {
                     boost::beast::error_code close_ec;
                     static_cast<void>(net_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_send, close_ec));
@@ -4584,7 +4579,7 @@ namespace __httpp_impl {
              */
             void run() {
                 acceptor.async_accept(
-                    [this](boost::beast::error_code ec, boost::asio::ip::tcp::socket Socket) {
+                    [this](const boost::beast::error_code& ec, boost::asio::ip::tcp::socket Socket) {
                         if (!ec) {
                             std::make_shared<Session>(std::move(Socket))->start();
                         }
@@ -4595,12 +4590,12 @@ namespace __httpp_impl {
             }
     };
 
-    void stop() {
+    inline void stop() {
         Listener::get_instance().stop();
     }
 }
 
-httpp::Server::Server::Server(const ServerSettings& settings, const std::function<httpp::Server::Response(const httpp::Server::Request&)>& callback) {
+inline httpp::Server::Server::Server(const ServerSettings& settings, const std::function<httpp::Server::Response(const httpp::Server::Request&)>& callback) {
     __httpp_impl::generate_response_from_endpoint = callback;
     __httpp_impl::session_dir = settings.session_directory;
     __httpp_impl::enable_session = settings.enable_session;
@@ -4609,7 +4604,7 @@ httpp::Server::Server::Server(const ServerSettings& settings, const std::functio
     __httpp_impl::Listener listener{settings.port};
 }
 
-void httpp::Server::Server::stop() {
+inline void httpp::Server::Server::stop() {
     __httpp_impl::stop();
 }
 #endif
