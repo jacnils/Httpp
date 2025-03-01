@@ -89,6 +89,7 @@ namespace httpp {
             std::string session_cookie_name{"session_id"};
             int64_t max_request_size{1024 * 1024 * 1024};
             std::vector<std::pair<std::string, int>> rate_limits{};
+            std::vector<std::string> blacklisted_ips{};
             int default_rate_limit{100};
         };
 
@@ -4266,6 +4267,7 @@ namespace __httpp_impl {
     static int64_t max_request_size{1024 * 1024 * 1024};
     static int default_rate_limit{100};
     static std::vector<std::pair<std::string, int>> rate_limited_endpoints{};
+    static std::vector<std::string> blacklisted_ips{};
     using RateLimitTracker = std::unordered_map<std::string, std::tuple<std::string, int64_t, int64_t>>;
     // ip -> (endpoint, last_request_time, request_count)
     // empty endpoint = all endpoints except explicitly specified
@@ -4327,6 +4329,12 @@ namespace __httpp_impl {
                 const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                 const auto endpoint = std::string(net_request.target().data(), net_request.target().size());
                 const std::string key = ip + ":" + endpoint;
+
+                for (const auto& it : blacklisted_ips) {
+                    if (ip == it) {
+                        return;
+                    }
+                }
 
                 int rate_limit = default_rate_limit;
                 for (const auto& [ep, limit] : rate_limited_endpoints) {
@@ -4641,6 +4649,7 @@ inline httpp::Server::Server::Server(const ServerSettings& settings, const std::
     __httpp_impl::max_request_size = settings.max_request_size;
     __httpp_impl::rate_limited_endpoints = settings.rate_limits;
     __httpp_impl::default_rate_limit = settings.default_rate_limit;
+    __httpp_impl::blacklisted_ips = settings.blacklisted_ips;
     __httpp_impl::Listener listener{settings.port};
 }
 
