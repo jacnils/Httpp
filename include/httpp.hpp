@@ -88,6 +88,8 @@ namespace httpp {
             std::string session_directory{"./"};
             std::string session_cookie_name{"session_id"};
             int64_t max_request_size{1024 * 1024 * 1024};
+            std::vector<std::pair<std::string, int>> rate_limits{};
+            int default_rate_limit{100};
         };
 
         /**
@@ -4262,6 +4264,12 @@ namespace __httpp_impl {
     static std::string session_dir{"./sessions"};
     static std::string session_cookie_name{"session_id"};
     static int64_t max_request_size{1024 * 1024 * 1024};
+    static int default_rate_limit{100};
+    static std::vector<std::pair<std::string, int>> rate_limited_endpoints{};
+    using RateLimitTracker = std::unordered_map<std::string, std::tuple<std::string, int64_t, int64_t>>;
+    // ip -> (endpoint, last_request_time, request_count)
+    // empty endpoint = all endpoints except explicitly specified
+    static RateLimitTracker rate_limit_tracker;
 
     inline std::string convert_unix_millis_to_gmt(const int64_t unix_millis) {
         if (unix_millis == -1) {
@@ -4308,10 +4316,40 @@ namespace __httpp_impl {
             void read_request() {
                 auto self = shared_from_this();
                 parser = std::make_shared<boost::beast::http::request_parser<boost::beast::http::string_body>>();
+
                 if (max_request_size != -1) {
                     parser->body_limit(max_request_size);
                 } else {
                     parser->body_limit((std::numeric_limits<std::uint64_t>::max)());
+                }
+
+                const auto ip = net_socket.remote_endpoint().address().to_string();
+                const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                const auto endpoint = std::string(net_request.target().data(), net_request.target().size());
+                const std::string key = ip + ":" + endpoint;
+
+                int rate_limit = default_rate_limit;
+                for (const auto& [ep, limit] : rate_limited_endpoints) {
+                    if (ep == endpoint) {
+                        rate_limit = limit;
+                        break;
+                    }
+                }
+
+                if (rate_limit_tracker.find(key) == rate_limit_tracker.end()) {
+                    rate_limit_tracker[key] = {endpoint, now, 1};
+                } else {
+                    auto& [ep, last_request_time, request_count] = rate_limit_tracker[key];
+                    if (now - last_request_time < 60000) {
+                        if (request_count >= rate_limit) {
+                            // Rate limit exceeded
+                            return;
+                        }
+                        request_count++;
+                    } else {
+                        last_request_time = now;
+                        request_count = 1;
+                    }
                 }
 
                 boost::beast::http::async_read(
@@ -4601,6 +4639,8 @@ inline httpp::Server::Server::Server(const ServerSettings& settings, const std::
     __httpp_impl::enable_session = settings.enable_session;
     __httpp_impl::session_cookie_name = settings.session_cookie_name;
     __httpp_impl::max_request_size = settings.max_request_size;
+    __httpp_impl::rate_limited_endpoints = settings.rate_limits;
+    __httpp_impl::default_rate_limit = settings.default_rate_limit;
     __httpp_impl::Listener listener{settings.port};
 }
 
