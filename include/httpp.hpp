@@ -12,6 +12,9 @@
 #ifndef HTTPP_SERVER
 #define HTTPP_SERVER 1
 #endif
+#ifndef HTTPP_SMTP
+#define HTTPP_SMTP 1
+#endif
 
 #include <string>
 #include <functional>
@@ -40,98 +43,105 @@ namespace httpp {
     enum class Protocol {
         Http,
         Https,
+        Smtp,
     };
 
-    /**
-     * @brief  Enum that contains the request types.
-     */
-    enum class Method {
-        Get,
-        Post,
-        Put,
-        Delete,
-    };
-
-    /**
-     * @brief  Class that represents a server.
-     */
-    namespace Server {
+    namespace http
+    {
         /**
-         * @brief  Struct that represents a cookie.
+         * @brief  Enum that contains the request types.
          */
-        struct Cookie {
-            std::string name{};
-            std::string value{};
-            int64_t expires{};
-            std::vector<std::string> attributes{};
-        };
-
-        /**
-         * @brief  Struct that represents an HTTP header.
-         */
-        struct Header {
-            std::string type{};
-            std::string content{};
-        };
-
-        enum class RedirectType {
-            Permanent,
-            Temporary,
-        };
-
-        /**
-         * @brief  Struct that contains the server settings.
-         */
-        struct ServerSettings {
-            int port{8080};
-            bool enable_session{true};
-            std::string session_directory{"./"};
-            std::string session_cookie_name{"session_id"};
-            int64_t max_request_size{1024 * 1024 * 1024};
-            std::vector<std::pair<std::string, int>> rate_limits{};
-            std::vector<std::string> blacklisted_ips{};
-            int default_rate_limit{100};
-        };
-
-        /**
-         * @brief  Struct that contains the request data.
-         */
-        struct Request {
-            std::string endpoint{};
-            std::unordered_map<std::string, std::string> query{};
-            std::string content_type{};
-            std::string body{};
-            std::string raw_body{};
-            std::string method{};
-            std::string ip_address{};
-            std::string user_agent{};
-            int version{};
-            std::vector<Cookie> cookies{};
-            std::unordered_map<std::string, std::string> session{};
-            std::unordered_map<std::string, std::string> fields{};
-        };
-
-        /**
-         * @brief  Struct that contains the response data.
-         */
-        struct Response {
-            int http_status{200};
-            std::string body{};
-            std::string content_type{"application/json"};
-            std::string allow_origin{"*"};
-            bool stop{false};
-            std::vector<Cookie> cookies{};
-            std::vector<std::string> delete_cookies{};
-            std::unordered_map<std::string, std::string> session{};
-            std::string location{};
-            RedirectType redirect_type{RedirectType::Temporary};
-            std::vector<Header> headers{};
+        enum class Method {
+            Get,
+            Post,
+            Put,
+            Delete,
         };
 
         /**
          * @brief  Class that represents a server.
          */
-        class Server {
+        namespace Server {
+            /**
+             * @brief  Struct that represents a cookie.
+             */
+            struct Cookie {
+                std::string name{};
+                std::string value{};
+                int64_t expires{};
+                std::string path{"/"};
+                std::string domain{};
+                std::string same_site{"Strict"};
+                std::vector<std::string> attributes{};
+                std::unordered_map<std::string, std::string> extra_attributes{};
+            };
+
+            /**
+             * @brief  Struct that represents an HTTP header.
+             */
+            struct Header {
+                std::string type{};
+                std::string content{};
+            };
+
+            enum class RedirectType {
+                Permanent,
+                Temporary,
+            };
+
+            /**
+             * @brief  Struct that contains the server settings.
+             */
+            struct ServerSettings {
+                int port{8080};
+                bool enable_session{true};
+                std::string session_directory{"./"};
+                std::string session_cookie_name{"session_id"};
+                int64_t max_request_size{1024 * 1024 * 1024};
+                std::vector<std::pair<std::string, int>> rate_limits{};
+                std::vector<std::string> blacklisted_ips{};
+                int default_rate_limit{100};
+            };
+
+            /**
+             * @brief  Struct that contains the request data.
+             */
+            struct Request {
+                std::string endpoint{};
+                std::unordered_map<std::string, std::string> query{};
+                std::string content_type{};
+                std::string body{};
+                std::string raw_body{};
+                std::string method{};
+                std::string ip_address{};
+                std::string user_agent{};
+                int version{};
+                std::vector<Cookie> cookies{};
+                std::unordered_map<std::string, std::string> session{};
+                std::unordered_map<std::string, std::string> fields{};
+            };
+
+            /**
+             * @brief  Struct that contains the response data.
+             */
+            struct Response {
+                int http_status{200};
+                std::string body{};
+                std::string content_type{"application/json"};
+                std::string allow_origin{"*"};
+                bool stop{false};
+                std::vector<Cookie> cookies{};
+                std::vector<std::string> delete_cookies{};
+                std::unordered_map<std::string, std::string> session{};
+                std::string location{};
+                RedirectType redirect_type{RedirectType::Temporary};
+                std::vector<Header> headers{};
+            };
+
+            /**
+             * @brief  Class that represents a server.
+             */
+            class Server {
             private:
                 int port{8080};
             public:
@@ -140,12 +150,87 @@ namespace httpp {
                  * @param  settings The settings for the server
                  * @param  callback The function to call when a request is made
                  */
-                Server(const ServerSettings& settings, const std::function<httpp::Server::Response(const httpp::Server::Request&)>& callback);
+                Server(const ServerSettings& settings, const std::function<httpp::http::Server::Response(const httpp::http::Server::Request&)>& callback);
                 /**
                  * @brief  Start the server
                  */
                 static void stop();
-        };
+            };
+        }
+
+        /**
+         * @brief  Class that represents a client.
+         */
+        namespace Client {
+            /**
+             * @brief  Class representing the response after making a network request
+             */
+            class Response { /* the response */
+                private:
+                public:
+                    int status_code{200};
+                    std::string body{};
+            };
+            /**
+             * @brief  Class representing a network request
+             */
+            class Request { /* the request */
+                private:
+                public:
+                    std::string host{};
+                    std::string endpoint{};
+                    std::string query{};
+                    std::string user_agent{"BASIC_USER_AGENT"};
+                    std::string body{};
+
+                    int port{80};
+                    Protocol protocol{Protocol::Http};
+                    Method type{Method::Get};
+
+                    std::vector<std::string> header_name{};
+                    std::vector<std::string> header_data{};
+                    std::string authentication_header_data{};
+                    std::string content_type_header_data{};
+                    bool authentication{false};
+
+                    std::string filename{};
+                    std::string output_file{};
+
+                    /**
+                     * @brief  Set an HTTP header
+                     * @param  header The header to set
+                     * @param  data The data to set the header to
+                     */
+                    void set_header(const std::string& header, const std::string& data);
+                    /**
+                     * @brief  Set the authentication header
+                     * @param  data The data to set the header to
+                     */
+                    void set_authentication_header(const std::string& data);
+                    /**
+                     * @brief  Set the Content-Type header
+                     * @param  data The data to set the header to
+                     */
+                    void set_content_type_header(const std::string& data);
+                    /**
+                     * @brief  Make a network request
+                     * @return Returns a Response object
+                     */
+                    Response make_request() const;
+                    /**
+                     * @brief  Download a file from a network request
+                     * @return Returns a boolean indicating if the download was successful
+                     */
+                    bool download_file() const;
+            };
+
+            inline std::string user_cert{}; // User-specified root certificate string, probably unused.
+
+            /**
+             * @brief  Function that gets the root certificate string.
+             */
+            std::string get_root_certificates();
+        }
     }
 
     /**
@@ -236,7 +321,7 @@ namespace httpp {
          * @param  max_chunk_size The max size of each chunk. If the chunk is larger, the file is rejected.
          * @return std::vector<snet::Utils::MultipartFile>
          */
-        std::vector<httpp::Utils::MultipartFile> parse_multipart_form_file(const Server::Request& request, const std::string& format, const std::size_t max_chunk_size = 100000000);
+        std::vector<httpp::Utils::MultipartFile> parse_multipart_form_file(const http::Server::Request& request, const std::string& format, const std::size_t max_chunk_size = 100000000);
         /**
          * @brief  Function that parses a multipart body, getting form data.
          * @param  request The body to parse.
@@ -259,103 +344,51 @@ namespace httpp {
     }
 
     /**
-     * @brief  Class that represents a client.
+     * @brief  Namespace that contains SMTP related classes and functions.
      */
-    namespace Client {
-        /**
-         * @brief  Class representing the response after making a network request
-         */
-        class Response { /* the response */
-            private:
-            public:
-                int status_code{200};
-                std::string body{};
-        };
-        /**
-         * @brief  Class representing a network request
-         */
-        class Request { /* the request */
-            private:
-            public:
-                std::string host{};
-                std::string endpoint{};
-                std::string query{};
-                std::string user_agent{"BASIC_USER_AGENT"};
-                std::string body{};
-
-                int port{80};
-                Protocol protocol{Protocol::Http};
-                Method type{Method::Get};
-
-                std::vector<std::string> header_name{};
-                std::vector<std::string> header_data{};
-                std::string authentication_header_data{};
-                std::string content_type_header_data{};
-                bool authentication{false};
-
-                std::string filename{};
-                std::string output_file{};
-
-                /**
-                 * @brief  Set an HTTP header
-                 * @param  header The header to set
-                 * @param  data The data to set the header to
-                 */
-                void set_header(const std::string& header, const std::string& data);
-                /**
-                 * @brief  Set the authentication header
-                 * @param  data The data to set the header to
-                 */
-                void set_authentication_header(const std::string& data);
-                /**
-                 * @brief  Set the Content-Type header
-                 * @param  data The data to set the header to
-                 */
-                void set_content_type_header(const std::string& data);
-                /**
-                 * @brief  Make a network request
-                 * @return Returns a Response object
-                 */
-                Response make_request() const;
-                /**
-                 * @brief  Download a file from a network request
-                 * @return Returns a boolean indicating if the download was successful
-                 */
-                bool download_file() const;
+    namespace smtp {
+        struct MailProperties {
+            std::string from{};
+            std::string to{};
+            std::string smtp_server{};
+            unsigned int smtp_port{465};
+            std::string username{};
+            std::string password{};
+            std::string subject{};
+            std::string data{};
+            std::string content_type{};
         };
 
-        inline std::string user_cert{}; // User-specified root certificate string, probably unused.
-
-        /**
-         * @brief  Function that gets the root certificate string.
-         */
-        std::string get_root_certificates();
+        class Client {
+        public:
+            Client(const MailProperties& prop);
+        };
     }
 }
 
 #if HTTPP_IMPLEMENTATION
 #if HTTPP_CLIENT
-inline void httpp::Client::Request::set_header(const std::string& header, const std::string& data) {
+inline void httpp::http::Client::Request::set_header(const std::string& header, const std::string& data) {
     header_name.push_back(header);
     header_data.push_back(data);
 }
 
-inline void httpp::Client::Request::set_authentication_header(const std::string& data) {
+inline void httpp::http::Client::Request::set_authentication_header(const std::string& data) {
     authentication_header_data = data;
     authentication = true;
 }
 
-inline void httpp::Client::Request::set_content_type_header(const std::string& data) {
+inline void httpp::http::Client::Request::set_content_type_header(const std::string& data) {
     content_type_header_data = data;
 }
 
-inline httpp::Client::Response httpp::Client::Request::make_request() const {
+inline httpp::http::Client::Response httpp::http::Client::Request::make_request() const {
     try {
         Response resp;
 
         boost::asio::ssl::context ctx(boost::asio::ssl::context::tlsv12_client);
 
-        const std::string cert = httpp::Client::get_root_certificates();
+        const std::string cert = httpp::http::Client::get_root_certificates();
 
         boost::system::error_code ec;
 
@@ -387,16 +420,16 @@ inline httpp::Client::Response httpp::Client::Request::make_request() const {
         boost::beast::http::verb verb;
 
         switch (type) {
-            case httpp::Method::Get:
+            case Method::Get:
                 verb = boost::beast::http::verb::get;
                 break;
-            case httpp::Method::Post:
+            case Method::Post:
                 verb = boost::beast::http::verb::post;
                 break;
-            case httpp::Method::Put:
+            case Method::Put:
                 verb = boost::beast::http::verb::put;
                 break;
-            case httpp::Method::Delete:
+            case Method::Delete:
                 verb = boost::beast::http::verb::delete_;
                 break;
             default:
@@ -466,11 +499,11 @@ inline httpp::Client::Response httpp::Client::Request::make_request() const {
     }
 }
 
-inline bool httpp::Client::Request::download_file() const {
+inline bool httpp::http::Client::Request::download_file() const {
     if (!output_file.compare(""))
         return false;
 
-    httpp::Client::Response resp = make_request();
+    httpp::http::Client::Response resp = make_request();
 
     std::ofstream of(output_file, std::ios::binary);
     of << resp.body;
@@ -485,7 +518,7 @@ inline bool httpp::Client::Request::download_file() const {
  * Should ideally be swapped out 5 or so years after
  * TODO: Write a program which generates a function like this using the latest root certificates.
  */
-inline std::string httpp::Client::get_root_certificates() {
+inline std::string httpp::http::Client::get_root_certificates() {
     if (user_cert.compare("")) {
         return user_cert;
     }
@@ -3992,7 +4025,7 @@ inline std::vector<httpp::Utils::MultipartFile> httpp::Utils::parse_multipart_fo
     return ret;
 }
 
-inline std::vector<httpp::Utils::MultipartFile> httpp::Utils::parse_multipart_form_file(const httpp::Server::Request& request, const std::string& format, const std::size_t max_chunk_size) {
+inline std::vector<httpp::Utils::MultipartFile> httpp::Utils::parse_multipart_form_file(const httpp::http::Server::Request& request, const std::string& format, const std::size_t max_chunk_size) {
     return parse_multipart_form_file("Content-Type: " + request.content_type + "\r\n" + request.body, format, max_chunk_size);
 }
 
@@ -4259,7 +4292,7 @@ inline std::string httpp::Utils::URL::assemble_url_from_parts() const {
 #endif
 #if HTTPP_SERVER
 namespace __httpp_impl {
-    inline std::function<httpp::Server::Response(const httpp::Server::Request&)> generate_response_from_endpoint;
+    inline std::function<httpp::http::Server::Response(const httpp::http::Server::Request&)> generate_response_from_endpoint;
     void stop();
     static bool enable_session{true};
     static std::string session_dir{"./sessions"};
@@ -4350,7 +4383,6 @@ namespace __httpp_impl {
                     auto& [ep, last_request_time, request_count] = rate_limit_tracker[key];
                     if (now - last_request_time < 60000) {
                         if (request_count >= rate_limit) {
-                            // Rate limit exceeded
                             return;
                         }
                         request_count++;
@@ -4385,8 +4417,8 @@ namespace __httpp_impl {
                 }
             }
 
-            static std::vector<httpp::Server::Cookie> get_cookies_from_request(const std::string& cookie_header) {
-                std::vector<httpp::Server::Cookie> cookies;
+            static std::vector<httpp::http::Server::Cookie> get_cookies_from_request(const std::string& cookie_header) {
+                std::vector<httpp::http::Server::Cookie> cookies;
                 std::string cookie_str = cookie_header + ";";
 
                 while (cookie_str.find(";") != std::string::npos) {
@@ -4461,7 +4493,7 @@ namespace __httpp_impl {
                     net_response.set(boost::beast::http::field::access_control_allow_headers, "Content-Type");
                 } else {
                     net_response = boost::beast::http::response<boost::beast::http::string_body>();
-                    httpp::Server::Request request{};
+                    httpp::http::Server::Request request{};
 
                     request.endpoint = std::string(net_request.target().data(), net_request.target().size());
 
@@ -4500,11 +4532,11 @@ namespace __httpp_impl {
                         request.session = read_from_session_file(session_file);
                     }
 
-                    httpp::Server::Response response = generate_response_from_endpoint(request);
+                    httpp::http::Server::Response response = generate_response_from_endpoint(request);
 
                     if (!session_id_found && enable_session) {
                         session_id = httpp::Utils::generate_random_string(64);
-                        response.cookies.push_back({session_cookie_name, session_id, 0, {"Path=/"}});
+                        response.cookies.push_back({session_cookie_name, session_id, 0, "/", .same_site = "Strict"});
                     } else if (enable_session) {
                         std::string session_file = session_dir + "/session_" + session_id + ".txt";
                         std::unordered_map<std::string, std::string> stored = read_from_session_file(session_file);
@@ -4523,8 +4555,20 @@ namespace __httpp_impl {
                         } else {
                             cookie_str += "Expires=Session; ";
                         }
+                        if (!it.path.empty()) {
+                            cookie_str += "Path=" + it.path + "; ";
+                        }
+                        if (!it.domain.empty()) {
+                            cookie_str += "Domain=" + it.domain + "; ";
+                        }
+                        if (!it.same_site.empty() && (it.same_site == "Strict" || it.same_site == "Lax")) {
+                            cookie_str += "SameSite=" + it.same_site + "; ";
+                        }
                         for (const auto& attribute : it.attributes) {
                             cookie_str += attribute + "; ";
+                        }
+                        for (const auto& attribute : it.extra_attributes) {
+                            cookie_str += attribute.first + "=" + attribute.second + "; ";
                         }
 
                         net_response.insert(boost::beast::http::field::set_cookie, cookie_str);
@@ -4542,9 +4586,9 @@ namespace __httpp_impl {
                     }
 
                     if (!response.location.empty()) {
-                        if (response.redirect_type == httpp::Server::RedirectType::Temporary) {
+                        if (response.redirect_type == httpp::http::Server::RedirectType::Temporary) {
                             net_response.result(boost::beast::http::status::temporary_redirect);
-                        } else if (response.redirect_type == httpp::Server::RedirectType::Permanent) {
+                        } else if (response.redirect_type == httpp::http::Server::RedirectType::Permanent) {
                             net_response.result(boost::beast::http::status::moved_permanently);
                         }
                         net_response.set(boost::beast::http::field::location, response.location);
@@ -4641,7 +4685,7 @@ namespace __httpp_impl {
     }
 }
 
-inline httpp::Server::Server::Server(const ServerSettings& settings, const std::function<httpp::Server::Response(const httpp::Server::Request&)>& callback) {
+inline httpp::http::Server::Server::Server(const ServerSettings& settings, const std::function<httpp::http::Server::Response(const httpp::http::Server::Request&)>& callback) {
     __httpp_impl::generate_response_from_endpoint = callback;
     __httpp_impl::session_dir = settings.session_directory;
     __httpp_impl::enable_session = settings.enable_session;
@@ -4653,8 +4697,161 @@ inline httpp::Server::Server::Server(const ServerSettings& settings, const std::
     __httpp_impl::Listener listener{settings.port};
 }
 
-inline void httpp::Server::Server::stop() {
+inline void httpp::http::Server::Server::stop() {
     __httpp_impl::stop();
 }
+#endif
+#if HTTPP_SMTP
+namespace __httpp_impl {
+    class SMTPClientInstance {
+    public:
+        SMTPClientInstance(boost::asio::io_context& io_context, boost::asio::ssl::context& ssl_context, const httpp::smtp::MailProperties& prop)
+            : resolver_(io_context), socket_(io_context, ssl_context), mail_properties_(prop) {}
+
+        void start() {
+            auto endpoints = resolver_.resolve(mail_properties_.smtp_server, std::to_string(mail_properties_.smtp_port));
+            boost::asio::async_connect(socket_.lowest_layer(), endpoints,
+                [this](const boost::system::error_code& ec, const boost::asio::ip::tcp::endpoint&) {
+                    if (!ec) {
+                        start_tls();
+                    } else {
+                        throw std::runtime_error("Connect error: " + ec.message());
+                    }
+                });
+        }
+
+    private:
+        std::string base64_encode(const std::string& input) {
+            BIO* b64 = BIO_new(BIO_f_base64());
+            BIO* mem = BIO_new(BIO_s_mem());
+            b64 = BIO_push(b64, mem);
+            BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+            BIO_write(b64, input.data(), input.size());
+            BIO_flush(b64);
+            BUF_MEM* buffer_ptr;
+            BIO_get_mem_ptr(b64, &buffer_ptr);
+            std::string output(buffer_ptr->data, buffer_ptr->length);
+            BIO_free_all(b64);
+            return output;
+        }
+
+        void start_tls() {
+            socket_.lowest_layer().set_option(boost::asio::ip::tcp::no_delay(true));
+            socket_.handshake(boost::asio::ssl::stream_base::client);
+            send_ehlo();
+        }
+
+        void send_ehlo() {
+            std::string domain = mail_properties_.from.substr(mail_properties_.from.find('@') + 1);
+            std::string ehlo_cmd = "EHLO " + domain + "\r\n";
+            boost::asio::async_write(socket_, boost::asio::buffer(ehlo_cmd),
+                [this](const boost::system::error_code& ec, std::size_t) {
+                    if (!ec) {
+                        read_response();
+                    } else {
+                        throw std::runtime_error("EHLO error: " + ec.message());
+                    }
+                });
+        }
+
+        void read_response() {
+            boost::asio::async_read_until(socket_, response_, "\r\n",
+                [this](const boost::system::error_code& ec, std::size_t) {
+                    if (!ec) {
+                        std::istream response_stream(&response_);
+                        std::string response_line;
+                        std::getline(response_stream, response_line);
+                        if (response_line.substr(0, 3) == "250") {
+                            send_auth_login();
+                        } else if (response_line.substr(0, 3) == "220") {
+                            start_tls();
+                        }
+                    } else {
+                        throw std::runtime_error("Read response error: " + ec.message());
+                    }
+                });
+        }
+
+        void send_auth_login() {
+            std::string auth_cmd = "AUTH LOGIN\r\n";
+            boost::asio::async_write(socket_, boost::asio::buffer(auth_cmd),
+                [this](const boost::system::error_code& ec, std::size_t) {
+                    if (!ec) {
+                        send_username();
+                    } else {
+                        throw std::runtime_error("Auth error: " + ec.message());
+                    }
+                });
+        }
+
+        void send_username() {
+            std::string encoded_username = base64_encode(mail_properties_.username) + "\r\n";
+            boost::asio::async_write(socket_, boost::asio::buffer(encoded_username),
+                [this](const boost::system::error_code& ec, std::size_t) {
+                    if (!ec) {
+                        send_password();
+                    } else {
+                        throw std::runtime_error("Username error: " + ec.message());
+                    }
+                });
+        }
+
+        void send_password() {
+            std::string encoded_password = base64_encode(mail_properties_.password) + "\r\n";
+            boost::asio::async_write(socket_, boost::asio::buffer(encoded_password),
+                [this](const boost::system::error_code& ec, std::size_t) {
+                    if (!ec) {
+                        send_email_data();
+                    } else {
+                        throw std::runtime_error("Password error: " + ec.message());
+                    }
+                });
+        }
+
+        std::string assemble_email_data() {
+            std::string email_data = "MAIL FROM:" + mail_properties_.from + "\r\n"
+                                     "RCPT TO:" + mail_properties_.to + "\r\n"
+                                     "DATA\r\n"
+                                     "Subject:" + mail_properties_.subject + "\r\n";
+
+            if (mail_properties_.content_type.empty()) {
+                email_data += "Content-Type: text/plain; charset=\"utf-8\"\r\n";
+            } else {
+                email_data += "Content-Type: " + mail_properties_.content_type + "\r\n";
+            }
+
+            email_data += mail_properties_.data + "\r\n";
+            email_data += ".\r\n";
+
+            return email_data;
+        }
+
+        void send_email_data() {
+            boost::asio::async_write(socket_, boost::asio::buffer(assemble_email_data()),
+                [this](const boost::system::error_code& ec, std::size_t) {
+                    if (!ec) {
+                        read_response();
+                    } else {
+                        throw std::runtime_error("Email data error: " + ec.message());
+                    }
+                });
+        }
+
+        boost::asio::ip::tcp::resolver resolver_;
+        boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket_;
+        boost::asio::streambuf response_;
+        httpp::smtp::MailProperties mail_properties_;
+    };
+}
+
+inline httpp::smtp::Client::Client(const MailProperties& prop) {
+    boost::asio::io_context ctx;
+    boost::asio::ssl::context ssl_ctx(boost::asio::ssl::context::tlsv13);
+    ssl_ctx.set_default_verify_paths();
+    __httpp_impl::SMTPClientInstance client(ctx, ssl_ctx, prop);
+    client.start();
+    ctx.run();
+}
+
 #endif
 #endif // HTTPP_IMPLEMENTATION
