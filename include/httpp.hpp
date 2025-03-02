@@ -294,6 +294,18 @@ namespace httpp {
          */
         std::string htmlspecialchars_decode(const std::string& str);
         /**
+         * @brief  Function that URL encodes a string.
+         * @param  str The string to encode.
+         * @return std::string
+         */
+        std::string urlencode(const std::string& str);
+        /**
+         * @brief  Function that URL decodes a string.
+         * @param  str The string to decode.
+         * @return std::string
+         */
+        std::string urldecode(const std::string& str);
+        /**
          * @brief  Function that removes single and double quotes from an std::string.
          * @param  str The string to replace in.
          * @return std::string
@@ -4049,6 +4061,44 @@ inline std::string httpp::Utils::htmlspecialchars(const std::string& str) {
     }
 
     return ret;
+}
+
+inline std::string httpp::Utils::urldecode(const std::string& str) {
+    std::string ret;
+    ret.reserve(str.length());
+
+    for (std::size_t i = 0; i < str.length(); ++i) {
+        if (str[i] == '%' && i + 2 < str.length()) {
+            std::istringstream iss(str.substr(i + 1, 2));
+            int hex_value;
+            if (iss >> std::hex >> hex_value) {
+                ret += static_cast<char>(hex_value);
+                i += 2;
+            } else {
+                ret += '%';
+            }
+        } else {
+            ret += str[i];
+        }
+    }
+
+    return ret;
+}
+
+inline std::string httpp::Utils::urlencode(const std::string& str) {
+    std::ostringstream encoded;
+    encoded.fill('0');
+    encoded << std::hex;
+
+    for (const auto& c : str) {
+        if (isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.' || c == '~') {
+            encoded << c;
+        } else {
+            encoded << '%' << std::setw(2) << static_cast<int>(static_cast<unsigned char>(c));
+        }
+    }
+
+    return encoded.str();
 }
 
 inline std::string httpp::Utils::htmlspecialchars_decode(const std::string& str) {
