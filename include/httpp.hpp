@@ -100,6 +100,7 @@ namespace httpp {
                 int64_t max_request_size{1024 * 1024 * 1024};
                 std::vector<std::pair<std::string, int>> rate_limits{};
                 std::vector<std::string> blacklisted_ips{};
+                std::vector<std::string> whitelisted_ips{"127.0.0.1"};
                 int default_rate_limit{100};
             };
 
@@ -4351,9 +4352,8 @@ namespace __httpp_impl {
     static int default_rate_limit{100};
     static std::vector<std::pair<std::string, int>> rate_limited_endpoints{};
     static std::vector<std::string> blacklisted_ips{};
+    static std::vector<std::string> whitelisted_ips{};
     using RateLimitTracker = std::unordered_map<std::string, std::tuple<std::string, int64_t, int64_t>>;
-    // ip -> (endpoint, last_request_time, request_count)
-    // empty endpoint = all endpoints except explicitly specified
     static RateLimitTracker rate_limit_tracker;
 
     inline std::string convert_unix_millis_to_gmt(const int64_t unix_millis) {
@@ -4409,6 +4409,25 @@ namespace __httpp_impl {
                 }
 
                 const auto ip = net_socket.remote_endpoint().address().to_string();
+
+                for (const auto& it : whitelisted_ips) {
+                    if (it != ip) {
+                        continue;
+                    }
+
+                    boost::beast::http::async_read(
+                        net_socket,
+                        net_buffer,
+                        *parser,
+
+                        [self](const boost::beast::error_code& ec, std::size_t transferred_bytes) {
+                            self->on_read(ec, transferred_bytes);
+                        }
+                    );
+
+                    return;
+                }
+
                 const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                 const auto endpoint = std::string(net_request.target().data(), net_request.target().size());
                 const std::string key = ip + ":" + endpoint;
@@ -4441,6 +4460,8 @@ namespace __httpp_impl {
                         request_count = 1;
                     }
                 }
+
+                c:
 
                 boost::beast::http::async_read(
                     net_socket,
@@ -4744,6 +4765,7 @@ inline httpp::http::Server::Server::Server(const ServerSettings& settings, const
     __httpp_impl::rate_limited_endpoints = settings.rate_limits;
     __httpp_impl::default_rate_limit = settings.default_rate_limit;
     __httpp_impl::blacklisted_ips = settings.blacklisted_ips;
+    __httpp_impl::whitelisted_ips = settings.whitelisted_ips;
     __httpp_impl::Listener listener{settings.port};
 }
 
