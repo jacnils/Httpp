@@ -102,6 +102,7 @@ namespace httpp {
                 std::vector<std::string> blacklisted_ips{};
                 std::vector<std::string> whitelisted_ips{"127.0.0.1"};
                 int default_rate_limit{100};
+                bool trust_x_forwarded_for{false};
             };
 
             /**
@@ -4355,6 +4356,7 @@ namespace __httpp_impl {
     static std::vector<std::string> whitelisted_ips{};
     using RateLimitTracker = std::unordered_map<std::string, std::tuple<std::string, int64_t, int64_t>>;
     static RateLimitTracker rate_limit_tracker;
+    static bool trust_x_forwarded_for{false};
 
     inline std::string convert_unix_millis_to_gmt(const int64_t unix_millis) {
         if (unix_millis == -1) {
@@ -4397,6 +4399,21 @@ namespace __httpp_impl {
             boost::beast::http::request<boost::beast::http::string_body> net_request;
             boost::beast::http::response<boost::beast::http::string_body> net_response;
             std::shared_ptr<boost::beast::http::request_parser<boost::beast::http::string_body>> parser;
+
+            std::string get_ip() {
+                if (trust_x_forwarded_for) {
+                    auto it = net_request.find("X-Forwarded-For");
+                    if (it != net_request.end()) {
+                        std::string x_forwarded_for = it->value();
+                        std::size_t pos = x_forwarded_for.find(',');
+                        if (pos != std::string::npos) {
+                            return x_forwarded_for.substr(0, pos);
+                        }
+                        return x_forwarded_for;
+                    }
+                }
+                return net_socket.remote_endpoint().address().to_string();
+            }
 
             void read_request() {
                 auto self = shared_from_this();
@@ -4573,7 +4590,7 @@ namespace __httpp_impl {
                     request.raw_body = oss.str(); // TODO: a little inefficient, but works for now
                     request.body = net_request.body();
                     request.fields = httpp::Utils::parse_fields(request.body);
-                    request.ip_address = net_socket.remote_endpoint().address().to_string();
+                    request.ip_address = get_ip();
                     request.method = net_request.method_string();
                     request.version = net_request.version();
                     request.user_agent = net_request.at(boost::beast::http::field::user_agent).data();
@@ -4766,6 +4783,7 @@ inline httpp::http::Server::Server::Server(const ServerSettings& settings, const
     __httpp_impl::default_rate_limit = settings.default_rate_limit;
     __httpp_impl::blacklisted_ips = settings.blacklisted_ips;
     __httpp_impl::whitelisted_ips = settings.whitelisted_ips;
+    __httpp_impl::trust_x_forwarded_for = settings.trust_x_forwarded_for;
     __httpp_impl::Listener listener{settings.port};
 }
 
